@@ -1,16 +1,35 @@
-# avian_log
+# AvianLog
 
-Avian Field Survey Transect Record Management System.
+鸟类野外调查样线记录管理系统。
 
-## Getting Started
+## 界面介绍
 
-This project is a starting point for a Flutter application.
+- “主页” 界面
 
-A few resources to get you started if this is your first Flutter project:
+    - “百科” 按钮、“调查” 按钮、“记录” 按钮
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- “百科” 界面
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+    - “搜索框”
+
+    - 百科内容
+
+- “调查” 界面
+
+    - 地图（主要）
+
+    - “+” 按钮
+
+        - 拍照
+
+        - 调查内容（经纬度-自动获取、鸟类信息-自动识别/主动填入、数量……）
+
+        - 跳转百科
+
+- “记录” 界面
+
+    - 样线
+
+    - 简单的数据统计
+
+    - 输出 PDF
