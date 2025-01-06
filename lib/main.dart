@@ -38,7 +38,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   static const List<Widget> _widgetOptions = <Widget>[
     EncyclopediaPage(),
-    SurveyPage(),
+    SurveyPage(), // 使用修改后的 SurveyPage
     RecordPage(),
   ];
 
