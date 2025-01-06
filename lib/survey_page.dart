@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'database/database_helper.dart'; // 导入数据库助手类
 
 class SurveyPage extends StatelessWidget {
   const SurveyPage({super.key});
@@ -52,10 +53,9 @@ class SurveyPage extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => SamplePointPage(
-                      sampleLine: 1,
                       samplePoint: 1,
                       initialTime: formattedTime,
-                      initialCoordinates: coordinates,
+                      initialCoordinates: coordinates, onSave: () {  },
                     ),
                   ),
                 );
@@ -75,17 +75,17 @@ class SurveyPage extends StatelessWidget {
 }
 
 class SamplePointPage extends StatefulWidget {
-  final int sampleLine;
-  final int samplePoint;
+  final int samplePoint; // 样点编号
   final String initialTime; // 初始时间
   final String initialCoordinates; // 初始经纬度
+  final VoidCallback onSave; // 保存后的回调函数
 
   const SamplePointPage({
     super.key,
-    required this.sampleLine,
     required this.samplePoint,
     required this.initialTime,
     required this.initialCoordinates,
+    required this.onSave,
   });
 
   @override
@@ -93,16 +93,18 @@ class SamplePointPage extends StatefulWidget {
 }
 
 class _SamplePointPageState extends State<SamplePointPage> {
-  // 定义“幼鸟”复选框的状态
-  bool _isYoungBird = false;
-
   // 定义“性别”单选按钮的状态
   String? _gender; // 'female' 或 'male'
 
-  // 定义时间输入框的控制器
+  // 定义输入框的控制器
   final TextEditingController _timeController = TextEditingController();
-  // 定义经纬度输入框的控制器
   final TextEditingController _coordinatesController = TextEditingController();
+  final TextEditingController _birdSpeciesController = TextEditingController();
+  final TextEditingController _quantityController = TextEditingController();
+  final TextEditingController _habitatTypeController = TextEditingController();
+  final TextEditingController _distanceToLineController = TextEditingController();
+  final TextEditingController _statusController = TextEditingController();
+  final TextEditingController _remarksController = TextEditingController();
 
   @override
   void initState() {
@@ -116,14 +118,11 @@ class _SamplePointPageState extends State<SamplePointPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('样线${widget.sampleLine}，样点${widget.samplePoint}'),
+        title: Text('样点${widget.samplePoint}'), // 只显示样点编号
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
-            onPressed: () {
-              // 保存数据并返回主界面
-              Navigator.pop(context);
-            },
+            onPressed: _saveSamplePoint, // 点击保存按钮时调用保存方法
           ),
         ],
       ),
@@ -138,13 +137,13 @@ class _SamplePointPageState extends State<SamplePointPage> {
                 children: [
                   _buildTextField('时间 (YYYY-MM-DD)', controller: _timeController),
                   _buildTextField('经纬度 (A, B)', controller: _coordinatesController),
-                  _buildTextField('鸟种'),
+                  _buildTextField('鸟种', controller: _birdSpeciesController),
                   _buildGenderRadio(), // 替换为性别单选按钮
-                  _buildTextField('数量'),
-                  _buildTextField('生境类型'),
-                  _buildTextField('距样线 (cm)'),
-                  _buildTextField('状态'),
-                  _buildTextField('备注', maxLines: 3),
+                  _buildTextField('数量', controller: _quantityController),
+                  _buildTextField('生境类型', controller: _habitatTypeController),
+                  _buildTextField('距样线 (cm)', controller: _distanceToLineController),
+                  _buildTextField('状态', controller: _statusController),
+                  _buildTextField('备注', controller: _remarksController, maxLines: 3),
                 ],
               ),
             ),
@@ -219,5 +218,33 @@ class _SamplePointPageState extends State<SamplePointPage> {
         ],
       ),
     );
+  }
+
+  // 保存样点数据
+  Future<void> _saveSamplePoint() async {
+    // 构造样点数据
+    final samplePoint = {
+      'time': _timeController.text,
+      'coordinates': _coordinatesController.text,
+      'birdSpecies': _birdSpeciesController.text,
+      'gender': _gender,
+      'quantity': int.tryParse(_quantityController.text) ?? 0,
+      'habitatType': _habitatTypeController.text,
+      'distanceToLine': int.tryParse(_distanceToLineController.text) ?? 0,
+      'status': _statusController.text,
+      'remarks': _remarksController.text,
+    };
+
+    // 插入数据到数据库
+    final dbHelper = DatabaseHelper();
+    await dbHelper.insertSamplePoint(samplePoint);
+
+    // 调用回调函数，通知 SurveyPage 增加样点编号
+    widget.onSave();
+
+    // 返回主界面
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 }
