@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'database/database_helper.dart'; // 导入数据库助手类
-import 'package:image_picker/image_picker.dart'; // 导入图片选择器
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'database/database_helper.dart';
 
 class SurveyPage extends StatefulWidget {
   const SurveyPage({super.key});
@@ -42,26 +44,21 @@ class _SurveyPageState extends State<SurveyPage> {
             padding: const EdgeInsets.all(16.0),
             child: ElevatedButton.icon(
               onPressed: () {
-                // 获取当前时间
                 final currentTime = DateTime.now();
                 final formattedTime =
                     "${currentTime.year}-${currentTime.month.toString().padLeft(2, '0')}-${currentTime.day.toString().padLeft(2, '0')}";
 
-                // 模拟经纬度数据
-                const latitude = 39.9042; // 纬度
-                const longitude = 116.4074; // 经度
+                const latitude = 39.9042;
+                const longitude = 116.4074;
                 const coordinates = '$latitude, $longitude';
 
-                // 跳转到样点界面，并传递时间和经纬度
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => SamplePointPage(
                       initialTime: formattedTime,
                       initialCoordinates: coordinates,
-                      onSave: () {
-                        // 保存成功后的回调
-                      },
+                      onSave: () {},
                     ),
                   ),
                 );
@@ -80,11 +77,10 @@ class _SurveyPageState extends State<SurveyPage> {
   }
 }
 
-
 class SamplePointPage extends StatefulWidget {
-  final String initialTime; // 初始时间
-  final String initialCoordinates; // 初始经纬度
-  final VoidCallback onSave; // 保存后的回调函数
+  final String initialTime;
+  final String initialCoordinates;
+  final VoidCallback onSave;
 
   const SamplePointPage({
     super.key,
@@ -98,7 +94,7 @@ class SamplePointPage extends StatefulWidget {
 }
 
 class _SamplePointPageState extends State<SamplePointPage> {
-  String? _gender; // 'female' 或 'male'
+  String? _gender;
   final TextEditingController _timeController = TextEditingController();
   final TextEditingController _coordinatesController = TextEditingController();
   final TextEditingController _birdSpeciesController = TextEditingController();
@@ -107,17 +103,15 @@ class _SamplePointPageState extends State<SamplePointPage> {
   final TextEditingController _distanceToLineController = TextEditingController();
   final TextEditingController _statusController = TextEditingController();
   final TextEditingController _remarksController = TextEditingController();
-  String? _imagePath; // 存储图片路径
+  String? _imagePath;
 
   @override
   void initState() {
     super.initState();
-    // 初始化时间和经纬度
     _timeController.text = widget.initialTime;
     _coordinatesController.text = widget.initialCoordinates;
   }
 
-  // 拍照功能
   Future<void> _takePhoto() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.camera);
@@ -126,6 +120,78 @@ class _SamplePointPageState extends State<SamplePointPage> {
       setState(() {
         _imagePath = pickedFile.path;
       });
+
+      // 调用百度动物识别 API
+      final speciesName = await _recognizeAnimal(pickedFile.path);
+      if (speciesName != null) {
+        _birdSpeciesController.text = speciesName;
+      } else {
+        print('未能识别到物种信息');
+      }
+    }
+  }
+
+  Future<String?> _recognizeAnimal(String imagePath) async {
+    final apiKey = 'ZD3RgiDY7RncuChAJljJRyfE';
+    final secretKey = 'b79d61b4TEFUZ9mQlHj95tiRGs99TgYK';
+    final accessToken = await _getAccessToken(apiKey, secretKey);
+
+    final file = File(imagePath);
+    final bytes = await file.readAsBytes();
+    final base64Image = base64Encode(bytes);
+
+    print('Base64 图片数据: ${base64Image.substring(0, 50)}...'); // 输出部分 Base64 数据
+
+    final url = Uri.parse('https://aip.baidubce.com/rest/2.0/image-classify/v1/animal?access_token=$accessToken');
+    print('请求 URL: $url');
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {'image': base64Image, 'baike_num': '1'},
+    );
+
+    print('API 响应状态码: ${response.statusCode}');
+    print('API 响应体: ${response.body}');
+
+    if (response.statusCode == 200) {
+      // 手动将响应体解码为 UTF-8
+      final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
+      if (jsonResponse['result'] != null && jsonResponse['result'].isNotEmpty) {
+        final result = jsonResponse['result'][0];
+        print('识别结果: ${result['name']} (置信度: ${result['score']})');
+        return result['name'];
+      } else {
+        print('未识别到任何物种');
+      }
+    } else {
+      print('API 请求失败: ${response.statusCode}');
+    }
+    return null;
+  }
+
+  Future<String> _getAccessToken(String apiKey, String secretKey) async {
+    final url = Uri.parse('https://aip.baidubce.com/oauth/2.0/token');
+    print('获取 Access Token 的 URL: $url');
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {
+        'grant_type': 'client_credentials',
+        'client_id': apiKey,
+        'client_secret': secretKey,
+      },
+    );
+
+    print('Access Token 响应状态码: ${response.statusCode}');
+    print('Access Token 响应体: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      return jsonResponse['access_token'];
+    } else {
+      throw Exception('获取 Access Token 失败: ${response.statusCode}');
     }
   }
 
@@ -133,11 +199,11 @@ class _SamplePointPageState extends State<SamplePointPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('新建样点'), // 直接显示“新建样点”
+        title: const Text('新建样点'),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
-            onPressed: _saveSamplePoint, // 点击保存按钮时调用保存方法
+            onPressed: _saveSamplePoint,
           ),
         ],
       ),
@@ -146,7 +212,6 @@ class _SamplePointPageState extends State<SamplePointPage> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              // 拍照按钮
               ElevatedButton.icon(
                 onPressed: _takePhoto,
                 icon: const Icon(Icons.camera_alt),
@@ -157,7 +222,6 @@ class _SamplePointPageState extends State<SamplePointPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // 显示拍摄的图片
               if (_imagePath != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
@@ -177,7 +241,7 @@ class _SamplePointPageState extends State<SamplePointPage> {
                       _buildTextField('时间 (YYYY-MM-DD)', controller: _timeController),
                       _buildTextField('经纬度 (A, B)', controller: _coordinatesController),
                       _buildTextField('鸟种', controller: _birdSpeciesController),
-                      _buildGenderRadio(), // 替换为性别单选按钮
+                      _buildGenderRadio(),
                       _buildTextField('数量', controller: _quantityController),
                       _buildTextField('生境类型', controller: _habitatTypeController),
                       _buildTextField('距样线 (cm)', controller: _distanceToLineController),
@@ -194,7 +258,6 @@ class _SamplePointPageState extends State<SamplePointPage> {
     );
   }
 
-  // 构建输入框
   Widget _buildTextField(String label, {int maxLines = 1, TextEditingController? controller}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -209,7 +272,6 @@ class _SamplePointPageState extends State<SamplePointPage> {
     );
   }
 
-  // 构建性别单选按钮
   Widget _buildGenderRadio() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -261,9 +323,7 @@ class _SamplePointPageState extends State<SamplePointPage> {
     );
   }
 
-  // 保存样点数据
   Future<void> _saveSamplePoint() async {
-    // 构造样点数据
     final samplePoint = {
       'time': _timeController.text,
       'coordinates': _coordinatesController.text,
@@ -274,17 +334,14 @@ class _SamplePointPageState extends State<SamplePointPage> {
       'distanceToLine': int.tryParse(_distanceToLineController.text) ?? 0,
       'status': _statusController.text,
       'remarks': _remarksController.text,
-      'imagePath': _imagePath, // 保存图片路径
+      'imagePath': _imagePath,
     };
 
-    // 插入数据到数据库
     final dbHelper = DatabaseHelper();
     await dbHelper.insertSamplePoint(samplePoint);
 
-    // 调用回调函数
     widget.onSave();
 
-    // 返回主界面
     if (mounted) {
       Navigator.pop(context);
     }
