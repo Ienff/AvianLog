@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'database/database_helper.dart'; // 导入数据库助手类
+import 'dart:io'; // 用于处理文件路径
 
 class RecordPage extends StatefulWidget {
   const RecordPage({super.key});
@@ -9,25 +10,27 @@ class RecordPage extends StatefulWidget {
 }
 
 class _RecordPageState extends State<RecordPage> {
-  // 定义存储样点数据的列表
   List<Map<String, dynamic>> _samplePoints = [];
-
-  // 定义数据库助手实例
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   @override
   void initState() {
     super.initState();
-    // 初始化时加载数据
     _loadSamplePoints();
   }
 
-  // 从数据库加载样点数据
+  // 加载样点数据
   Future<void> _loadSamplePoints() async {
     final data = await _dbHelper.getSamplePoints();
     setState(() {
       _samplePoints = data;
     });
+  }
+
+  // 删除样点数据
+  Future<void> _deleteSamplePoint(int id) async {
+    await _dbHelper.deleteSamplePoint(id);
+    _loadSamplePoints(); // 删除后重新加载数据
   }
 
   @override
@@ -59,6 +62,34 @@ class _RecordPageState extends State<RecordPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '样点${samplePoint['id']}', // 显示样点编号
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        onPressed: () {
+                          _deleteSamplePoint(samplePoint['id']); // 删除样点
+                        },
+                      ),
+                    ],
+                  ),
+                  if (samplePoint['imagePath'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Image.file(
+                        File(samplePoint['imagePath']),
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   Text('时间: ${samplePoint['time']}'),
                   Text('经纬度: ${samplePoint['coordinates']}'),
                   Text('鸟种: ${samplePoint['birdSpecies']}'),

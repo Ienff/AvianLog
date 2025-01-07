@@ -1,16 +1,21 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'database/database_helper.dart'; // 导入数据库助手类
+import 'package:image_picker/image_picker.dart'; // 导入图片选择器
 
-class SurveyPage extends StatelessWidget {
+class SurveyPage extends StatefulWidget {
   const SurveyPage({super.key});
 
   @override
+  _SurveyPageState createState() => _SurveyPageState();
+}
+
+class _SurveyPageState extends State<SurveyPage> {
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 保持底部导航栏的功能
       body: Column(
         children: [
-          // 地图占位（边缘弧形的正方形）
           Expanded(
             flex: 2,
             child: Padding(
@@ -33,7 +38,6 @@ class SurveyPage extends StatelessWidget {
               ),
             ),
           ),
-          // 新建样点按钮
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: ElevatedButton.icon(
@@ -53,9 +57,11 @@ class SurveyPage extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => SamplePointPage(
-                      samplePoint: 1,
                       initialTime: formattedTime,
-                      initialCoordinates: coordinates, onSave: () {  },
+                      initialCoordinates: coordinates,
+                      onSave: () {
+                        // 保存成功后的回调
+                      },
                     ),
                   ),
                 );
@@ -74,15 +80,14 @@ class SurveyPage extends StatelessWidget {
   }
 }
 
+
 class SamplePointPage extends StatefulWidget {
-  final int samplePoint; // 样点编号
   final String initialTime; // 初始时间
   final String initialCoordinates; // 初始经纬度
   final VoidCallback onSave; // 保存后的回调函数
 
   const SamplePointPage({
     super.key,
-    required this.samplePoint,
     required this.initialTime,
     required this.initialCoordinates,
     required this.onSave,
@@ -93,10 +98,7 @@ class SamplePointPage extends StatefulWidget {
 }
 
 class _SamplePointPageState extends State<SamplePointPage> {
-  // 定义“性别”单选按钮的状态
   String? _gender; // 'female' 或 'male'
-
-  // 定义输入框的控制器
   final TextEditingController _timeController = TextEditingController();
   final TextEditingController _coordinatesController = TextEditingController();
   final TextEditingController _birdSpeciesController = TextEditingController();
@@ -105,6 +107,7 @@ class _SamplePointPageState extends State<SamplePointPage> {
   final TextEditingController _distanceToLineController = TextEditingController();
   final TextEditingController _statusController = TextEditingController();
   final TextEditingController _remarksController = TextEditingController();
+  String? _imagePath; // 存储图片路径
 
   @override
   void initState() {
@@ -114,11 +117,23 @@ class _SamplePointPageState extends State<SamplePointPage> {
     _coordinatesController.text = widget.initialCoordinates;
   }
 
+  // 拍照功能
+  Future<void> _takePhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.camera);
+
+    if (pickedFile != null) {
+      setState(() {
+        _imagePath = pickedFile.path;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('样点${widget.samplePoint}'), // 只显示样点编号
+        title: const Text('新建样点'), // 直接显示“新建样点”
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -129,24 +144,50 @@ class _SamplePointPageState extends State<SamplePointPage> {
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Card(
-            elevation: 4,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  _buildTextField('时间 (YYYY-MM-DD)', controller: _timeController),
-                  _buildTextField('经纬度 (A, B)', controller: _coordinatesController),
-                  _buildTextField('鸟种', controller: _birdSpeciesController),
-                  _buildGenderRadio(), // 替换为性别单选按钮
-                  _buildTextField('数量', controller: _quantityController),
-                  _buildTextField('生境类型', controller: _habitatTypeController),
-                  _buildTextField('距样线 (cm)', controller: _distanceToLineController),
-                  _buildTextField('状态', controller: _statusController),
-                  _buildTextField('备注', controller: _remarksController, maxLines: 3),
-                ],
+          child: Column(
+            children: [
+              // 拍照按钮
+              ElevatedButton.icon(
+                onPressed: _takePhoto,
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('拍照'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  textStyle: const TextStyle(fontSize: 18),
+                ),
               ),
-            ),
+              const SizedBox(height: 16),
+              // 显示拍摄的图片
+              if (_imagePath != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Image.file(
+                    File(_imagePath!),
+                    height: 200,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              Card(
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      _buildTextField('时间 (YYYY-MM-DD)', controller: _timeController),
+                      _buildTextField('经纬度 (A, B)', controller: _coordinatesController),
+                      _buildTextField('鸟种', controller: _birdSpeciesController),
+                      _buildGenderRadio(), // 替换为性别单选按钮
+                      _buildTextField('数量', controller: _quantityController),
+                      _buildTextField('生境类型', controller: _habitatTypeController),
+                      _buildTextField('距样线 (cm)', controller: _distanceToLineController),
+                      _buildTextField('状态', controller: _statusController),
+                      _buildTextField('备注', controller: _remarksController, maxLines: 3),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -233,13 +274,14 @@ class _SamplePointPageState extends State<SamplePointPage> {
       'distanceToLine': int.tryParse(_distanceToLineController.text) ?? 0,
       'status': _statusController.text,
       'remarks': _remarksController.text,
+      'imagePath': _imagePath, // 保存图片路径
     };
 
     // 插入数据到数据库
     final dbHelper = DatabaseHelper();
     await dbHelper.insertSamplePoint(samplePoint);
 
-    // 调用回调函数，通知 SurveyPage 增加样点编号
+    // 调用回调函数
     widget.onSave();
 
     // 返回主界面
