@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart'; // 新增定位依赖
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'database/database_helper.dart';
@@ -13,6 +15,56 @@ class SurveyPage extends StatefulWidget {
 }
 
 class _SurveyPageState extends State<SurveyPage> {
+  // 新增定位状态变量
+  Position? _currentPosition;
+  StreamSubscription<Position>? _positionStream;
+
+  @override
+  void dispose() {
+    _positionStream?.cancel();
+    super.dispose();
+  }
+
+  // 核心定位方法
+  Future<Position?> _getCurrentLocation() async {
+    try {
+      // 步骤1：检查定位服务是否开启
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showErrorSnackbar('请开启设备定位服务');
+        return null;
+      }
+
+      // 步骤2：检查并请求权限
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.whileInUse) {
+          _showErrorSnackbar('需要位置权限以继续操作');
+          return null;
+        }
+      }
+
+      // 步骤3：获取高精度位置
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.best,
+        timeLimit: const Duration(seconds: 15),
+      );
+    } catch (e) {
+      _showErrorSnackbar('定位失败: ${e.toString()}');
+      return null;
+    }
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -26,14 +78,33 @@ class _SurveyPageState extends State<SurveyPage> {
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
                   color: Colors.blue[100],
-                  child: const Center(
-                    child: Text(
-                      '地图区域',
+                  child: Center(
+                    child: _currentPosition == null
+                        ? const Text(
+                      '等待定位...',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.blue,
                       ),
+                    )
+                        : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '当前坐标:',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '纬度: ${_currentPosition!.latitude.toStringAsFixed(6)}',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        Text(
+                          '经度: ${_currentPosition!.longitude.toStringAsFixed(6)}',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -43,21 +114,23 @@ class _SurveyPageState extends State<SurveyPage> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: ElevatedButton.icon(
-              onPressed: () {
+              onPressed: () async {
+                final position = await _getCurrentLocation();
+                if (position == null) return;
+
+                setState(() => _currentPosition = position);
+
                 final currentTime = DateTime.now();
                 final formattedTime =
                     "${currentTime.year}-${currentTime.month.toString().padLeft(2, '0')}-${currentTime.day.toString().padLeft(2, '0')}";
-
-                const latitude = 39.9042;
-                const longitude = 116.4074;
-                const coordinates = '$latitude, $longitude';
 
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => SamplePointPage(
                       initialTime: formattedTime,
-                      initialCoordinates: coordinates,
+                      initialCoordinates:
+                      '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}',
                       onSave: () {},
                     ),
                   ),
